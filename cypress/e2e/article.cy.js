@@ -1,43 +1,52 @@
 describe('', () => {
-  const title = 'Testowy tytuł artykułu';
-  const description = 'To jest testowy opis artykułu.';
-  const body = 'To jest treść testowego artykułu. Możemy użyć markdown.';
+  let user;
+  let article;
 
   const articleTitlePlaceholder = 'Article Title';
   const articleDescriptionPlaceholder = 'What\'s this article about?';
   const articleBodyPlaceholder = 'Write your article (in markdown)';
 
   beforeEach(() => {
-    cy.visit('/user/login');
-    cy.get('input[type=email]').type('radoslaw.grzymala@hotmail.com');
-    cy.get('input[type=password]').type('Radko!23');
-    cy.get('button[type=submit]').click();
+    cy.task('generateUser').then((generateUser) => {
+      user = generateUser;
+    });
+
+    cy.task('generateArticle').then((generateArticle) => {
+      article = generateArticle;
+    });
   });
 
-  const createArticle = () => {
-    cy.get('a.nav-link[href="/editor"]').click();
-    cy.location('pathname').should('eq', '/editor');
-
-    cy.get(`input[placeholder="${articleTitlePlaceholder}"]`).type(title);
-    cy.get(`input[placeholder="${articleDescriptionPlaceholder}"]`).type(description);
-    cy.get(`textarea[placeholder="${articleBodyPlaceholder}"]`).type(body);
+  it('Should create article', () => {
+    cy.login(user.email, user.username, user.password);
+    cy.visit('/');
+    cy.get('a').contains('New Article').click();
+    cy
+      .get(`input[placeholder="${articleTitlePlaceholder}"]`)
+      .type(article.title);
+    cy
+      .get(`input[placeholder="${articleDescriptionPlaceholder}"]`)
+      .type(article.description);
+    cy
+      .get(`textarea[placeholder="${articleBodyPlaceholder}"]`)
+      .type(article.body);
     cy.get('button.btn-primary').click();
 
-    cy.get('h1').should('contain', title);
-    cy.get('.article-content').should('contain', body);
+    cy.get('h1').should('contain', article.title);
+    cy.get('.article-content').should('contain', article.body);
     cy.url().should('include', '/article/');
-  };
-
-  it('Should create article', () => {
-    createArticle();
   });
 
   it('Should delete article', () => {
-    createArticle();
-
-    cy.url().should('include', '/article/');
-    cy.get('button.btn-outline-danger:first').click();
-    cy.location('pathname').should('eq', '/');
-    cy.get('.article-preview').should('not.contain', title);
+    cy.login(user.email, user.username, user.password);
+    cy.visit('/');
+    cy.createArticle(article.title, article.description, article.body)
+      .then((response) => {
+        cy.visit(`/article/${response.body.article.slug}`);
+        cy.get('.btn').contains('Delete Article').click();
+        cy.on('window:confirm', (str) => {
+          expect(str).to.equal('Do you really want to delete it?');
+        });
+        cy.url().should('equal', 'https://conduit.mate.academy/');
+      });
   });
 });
